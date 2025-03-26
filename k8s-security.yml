@@ -18,9 +18,9 @@
   roles:
     - { role: common, tags: ['common', 'all'] }
     - { role: admin_user, tags: ['users', 'all'] }
-    - { role: ssh, tags: ['ssh', 'all'] }
+    - { role: ssh_hardening, tags: ['ssh', 'all'] }
     - { role: firewall, tags: ['firewall', 'all'] }
-    - { role: kernel, tags: ['kernel', 'all'] }
+    - { role: kernel_hardening, tags: ['kernel', 'all'] }
     - { role: audit, tags: ['audit', 'all'] }
     - { role: fail2ban, tags: ['fail2ban', 'all'] }
     - { role: containerd_security, tags: ['container', 'all'] }
