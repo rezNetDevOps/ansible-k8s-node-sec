@@ -2,7 +2,23 @@
 # Audit handlers
 
 - name: restart auditd
-  service:
-    name: auditd
-    state: restarted
-  when: not ansible_check_mode 
+  block:
+    - name: Restart auditd service
+      service:
+        name: auditd
+        state: restarted
+      register: service_restart
+      failed_when: false
+      when: not ansible_check_mode
+      
+    - name: Check if service restart failed
+      debug:
+        msg: "Warning: auditd service restart failed. Will try alternative method."
+      when: service_restart is defined and service_restart.failed is defined and service_restart.failed
+      
+    - name: Alternative auditd restart (if service failed)
+      shell: systemctl stop auditd && sleep 2 && systemctl start auditd
+      args:
+        warn: false
+      when: service_restart is defined and service_restart.failed is defined and service_restart.failed
+      ignore_errors: true 

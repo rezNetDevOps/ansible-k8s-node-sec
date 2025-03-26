@@ -24,6 +24,7 @@
     - { role: audit, tags: ['audit', 'all'] }
     - { role: fail2ban, tags: ['fail2ban', 'all'] }
     - { role: containerd_security, tags: ['container', 'all'] }
+    - { role: metrics_fix, tags: ['metrics', 'all'] }
 
   post_tasks:
     - name: Verify system status

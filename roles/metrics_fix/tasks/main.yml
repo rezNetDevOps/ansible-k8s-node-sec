@@ -1,0 +1,66 @@
+---
+# Tasks to repair metrics-server functionality after security hardening
+
+- name: Check if metrics-server exists in kube-system namespace
+  shell: kubectl get deployment metrics-server -n kube-system 2>/dev/null || echo "not found"
+  register: metrics_server_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Get the current metrics-server pod name
+  shell: kubectl get pod -n kube-system -l k8s-app=metrics-server -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo ""
+  register: metrics_server_pod
+  changed_when: false
+  ignore_errors: true
+  when: metrics_server_check.stdout != "not found"
+
+- name: Check current metrics-server configuration
+  shell: kubectl get deployment metrics-server -n kube-system -o yaml
+  register: metrics_server_config
+  changed_when: false
+  ignore_errors: true
+  when: metrics_server_check.stdout != "not found"
+
+- name: Patch metrics-server deployment for TLS and address types
+  shell: |
+    cat <<EOF | kubectl patch deployment metrics-server -n kube-system --patch "$(cat)"
+    spec:
+      template:
+        spec:
+          containers:
+          - name: metrics-server
+            args:
+            - --cert-dir=/tmp
+            - --secure-port=4443
+            - --kubelet-insecure-tls
+            - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+    EOF
+  when: 
+    - metrics_server_check.stdout != "not found"
+    - metrics_server_config is defined
+    - metrics_server_config.stdout is defined
+    - "'--kubelet-insecure-tls' not in metrics_server_config.stdout"
+  register: patch_result
+
+- name: Restart metrics-server pods if patched
+  shell: kubectl delete pods -n kube-system -l k8s-app=metrics-server
+  when: patch_result.changed | default(false)
+
+- name: Wait for metrics-server to become ready
+  shell: kubectl wait --for=condition=Ready pod -l k8s-app=metrics-server -n kube-system --timeout=60s
+  register: wait_result
+  until: wait_result.rc == 0
+  retries: 3
+  delay: 10
+  ignore_errors: true
+  when: patch_result.changed | default(false)
+
+- name: Validate metrics API is working
+  shell: kubectl get --raw "/apis/metrics.k8s.io/v1beta1/nodes" || echo "Metrics API still not available"
+  register: metrics_api_check
+  changed_when: false
+  ignore_errors: true
+  
+- name: Display result of metrics API check
+  debug:
+    msg: "{{ metrics_api_check.stdout }}" 

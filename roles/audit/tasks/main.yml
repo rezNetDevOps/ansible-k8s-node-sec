@@ -41,8 +41,33 @@
     owner: root
     group: root
     mode: '0640'
-  notify: restart auditd
+  register: audit_rules_updated
   when: not ansible_check_mode or audit_install.changed
+
+- name: Validate audit rules
+  command: auditctl -R /etc/audit/rules.d/audit.rules
+  args:
+    warn: false
+  register: audit_rules_validation
+  changed_when: false
+  failed_when: false
+  when: audit_rules_updated is defined and audit_rules_updated.changed
+
+- name: Debug audit rules validation
+  debug:
+    msg: "Audit rules validation result: {{ audit_rules_validation.stderr if audit_rules_validation.stderr is defined else 'OK' }}"
+  when: audit_rules_validation is defined
+
+- name: Load audit rules directly (if validation succeeded)
+  command: auditctl -R /etc/audit/rules.d/audit.rules
+  args:
+    warn: false
+  when: 
+    - audit_rules_validation is defined 
+    - audit_rules_validation.rc == 0
+    - not ansible_check_mode
+  changed_when: true
+  notify: restart auditd
 
 - name: Ensure auditd is running and enabled
   service:

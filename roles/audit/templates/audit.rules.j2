@@ -38,7 +38,4 @@
 # Disallow modification of audit configurations
 -w /etc/audit/ -p wa -k audit_config_change
 -w /etc/libaudit.conf -p wa -k audit_config_change
--w /etc/audisp/ -p wa -k audisp_config_change
-
-# Make audit config immutable - requires reboot to change audit rules
--e 2 
+-w /etc/audisp/ -p wa -k audisp_config_change 
