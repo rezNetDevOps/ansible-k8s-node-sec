@@ -95,12 +95,12 @@
       when:
         - ansible_facts.services['systemd-timesyncd.service'] is defined
         - ansible_facts.services['systemd-timesyncd.service'].state != 'running'
-        - ansible_facts.services['ntpd.service'] is not defined or 
-          ansible_facts.services['ntpd.service'].state != 'running'
-        - ansible_facts.services['ntpsec.service'] is not defined or 
-          ansible_facts.services['ntpsec.service'].state != 'running'
-        - ansible_facts.services['chronyd.service'] is not defined or 
-          ansible_facts.services['chronyd.service'].state != 'running'
+        - (ansible_facts.services['ntpd.service'] is not defined or 
+          ansible_facts.services['ntpd.service'].state != 'running')
+        - (ansible_facts.services['ntpsec.service'] is not defined or 
+          ansible_facts.services['ntpsec.service'].state != 'running')
+        - (ansible_facts.services['chronyd.service'] is not defined or 
+          ansible_facts.services['chronyd.service'].state != 'running')
 
 - name: Create security status file
   copy:

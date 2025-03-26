@@ -1,0 +1,6 @@
+---
+# Firewall role handlers
+
+- name: Enable UFW
+  command: ufw --force enable
+  changed_when: true 
