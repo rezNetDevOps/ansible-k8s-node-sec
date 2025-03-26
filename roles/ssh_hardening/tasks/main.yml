@@ -1,0 +1,77 @@
+---
+# SSH hardening role tasks
+
+- name: Backup SSH configuration
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: /root/security-backup/sshd_config.backup
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0600'
+  when: not ansible_check_mode
+
+- name: Ensure strong SSH configuration
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: "^#?{{ item.key }}\\s+"
+    line: "{{ item.key }} {{ item.value }}"
+    state: present
+    backup: false
+  loop:
+    - { key: "PermitRootLogin", value: "{{ ssh_permit_root_login }}" }
+    - { key: "PasswordAuthentication", value: "{{ ssh_password_authentication }}" }
+    - { key: "X11Forwarding", value: "{{ ssh_x11_forwarding }}" }
+    - { key: "MaxAuthTries", value: "{{ ssh_max_auth_tries }}" }
+    - { key: "ClientAliveInterval", value: "{{ ssh_client_alive_interval }}" }
+    - { key: "ClientAliveCountMax", value: "{{ ssh_client_alive_count_max }}" }
+    - { key: "Protocol", value: "2" }
+    - { key: "AllowAgentForwarding", value: "{{ ssh_allow_agent_forwarding }}" }
+    - { key: "AllowTcpForwarding", value: "{{ ssh_allow_tcp_forwarding }}" }
+  notify: Restart SSH service
+
+- name: Configure port for SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: "^#?Port\\s+"
+    line: "Port {{ ssh_port }}"
+    state: present
+  notify: Restart SSH service
+
+- name: Disable weak SSH host key algorithms
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: "^#?HostKeyAlgorithms\\s+"
+    line: "HostKeyAlgorithms ssh-ed25519,ssh-rsa"
+    state: present
+  notify: Restart SSH service
+
+- name: Disable weak ciphers
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: "^#?Ciphers\\s+"
+    line: "Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr"
+    state: present
+  notify: Restart SSH service
+
+- name: Disable weak MAC algorithms
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: "^#?MACs\\s+"
+    line: "MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com"
+    state: present
+  notify: Restart SSH service
+
+- name: Disable weak key exchange algorithms
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: "^#?KexAlgorithms\\s+"
+    line: "KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256"
+    state: present
+  notify: Restart SSH service
+
+- name: Ensure SSH service is running and enabled
+  service:
+    name: ssh
+    state: started
+    enabled: true

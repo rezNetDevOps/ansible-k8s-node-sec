@@ -1,0 +1,32 @@
+---
+# Kernel hardening tasks
+
+- name: Backup sysctl.conf
+  copy:
+    src: /etc/sysctl.conf
+    dest: /root/security-backup/sysctl.conf.backup
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0600'
+  when: not ansible_check_mode
+
+- name: Set kernel parameters for security
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+    sysctl_file: /etc/sysctl.d/99-kubernetes-security.conf
+  with_items: "{{ sysctl_settings }}"
+
+- name: Ensure the sysctl file has proper permissions
+  file:
+    path: /etc/sysctl.d/99-kubernetes-security.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Apply sysctl settings
+  command: sysctl --system
+  changed_when: false

@@ -1,0 +1,34 @@
+---
+# Kubernetes Node Security Hardening Playbook
+# This playbook applies security best practices to Kubernetes nodes
+
+- name: Apply security hardening to all K8s nodes
+  hosts: all
+  become: true
+  vars_files:
+    - vars/main.yml
+  
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+    
+    - name: Gather facts about the system
+      setup:
+  
+  roles:
+    - { role: common, tags: ['common', 'all'] }
+    - { role: admin_user, tags: ['admin_user', 'all'] }
+    - { role: ssh_hardening, tags: ['ssh', 'all'] }
+    - { role: firewall, tags: ['firewall', 'all'] }
+    - { role: kernel_hardening, tags: ['kernel', 'all'] }
+    - { role: audit, tags: ['audit', 'all'] }
+    - { role: fail2ban, tags: ['fail2ban', 'all'] }
+    - { role: containerd_security, tags: ['container', 'all'] }
+
+  post_tasks:
+    - name: Verify system status
+      debug:
+        msg: "Security hardening has been applied to {{ inventory_hostname }}" 

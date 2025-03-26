@@ -1,0 +1,75 @@
+---
+# Admin user role tasks
+
+- name: Ensure admin group exists
+  group:
+    name: "{{ admin_user }}"
+    state: present
+
+- name: Create admin user
+  user:
+    name: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    shell: /bin/bash
+    createhome: yes
+    state: present
+
+- name: Set up sudo access for admin user
+  template:
+    src: admin-sudoers.j2
+    dest: "/etc/sudoers.d/{{ admin_user }}"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: 'visudo -cf %s'
+
+- name: Create SSH directory for admin user
+  file:
+    path: "/home/{{ admin_user }}/.ssh"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0700'
+
+- name: Check if ED25519 key exists locally
+  stat:
+    path: "{{ admin_ssh_key_path }}"
+  delegate_to: localhost
+  register: ssh_key_stat
+  become: false
+
+- name: Generate ED25519 key if it doesn't exist
+  command: "ssh-keygen -t {{ admin_ssh_key_type }} -f {{ admin_ssh_key_path }} -N '' -C '{{ admin_user }}@k8s-admin'"
+  delegate_to: localhost
+  become: false
+  when: not ssh_key_stat.stat.exists
+
+- name: Fetch the public key content
+  slurp:
+    src: "{{ admin_ssh_key_path }}.pub"
+  delegate_to: localhost
+  become: false
+  register: public_key_content
+  
+- name: Set up authorized_keys for admin user
+  authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ public_key_content['content'] | b64decode }}"
+    state: present
+
+- name: Set proper permissions on admin user home directory
+  file:
+    path: "/home/{{ admin_user }}"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0750'
+    recurse: yes
+
+- name: Verify SSH access
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ssh_port }}"
+    timeout: 10
+    delay: 5
+  delegate_to: localhost
+  become: false

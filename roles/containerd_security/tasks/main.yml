@@ -1,0 +1,61 @@
+---
+# Containerd security configuration tasks
+
+- name: Backup containerd config
+  copy:
+    src: /etc/containerd/config.toml
+    dest: /root/security-backup/config.toml.backup
+    remote_src: true
+    force: false
+  ignore_errors: true
+  register: backup_result
+
+- name: Check if containerd config exists
+  stat:
+    path: /etc/containerd/config.toml
+  register: containerd_config_stat
+
+- name: Generate default containerd config if it doesn't exist
+  command: containerd config default
+  register: default_config
+  changed_when: true
+  when: not containerd_config_stat.stat.exists
+
+- name: Save default config if generated
+  copy:
+    content: "{{ default_config.stdout }}"
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: '0644'
+  when: not containerd_config_stat.stat.exists
+
+- name: Enable systemd cgroup driver
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: '(SystemdCgroup = )false'
+    replace: '\1{{ containerd_enable_systemd_cgroup | string | lower }}'
+  register: cgroup_update
+  when: containerd_enable_systemd_cgroup
+
+- name: Set NoNewPrivileges option
+  blockinfile:
+    path: /etc/containerd/config.toml
+    insertafter: '\[plugins\."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options\]'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - NoNewPrivileges setting"
+    block: "        NoNewPrivileges = {{ containerd_no_new_privileges | string | lower }}"
+  register: no_new_privileges_update
+  when: containerd_no_new_privileges
+
+- name: Set containerd socket permissions
+  file:
+    path: /run/containerd/containerd.sock
+    mode: "{{ containerd_socket_permissions }}"
+  ignore_errors: true
+
+- name: Restart containerd when configuration changes
+  service:
+    name: containerd
+    state: restarted
+    enabled: yes
+  when: cgroup_update.changed or no_new_privileges_update.changed or default_config is defined and default_config.changed

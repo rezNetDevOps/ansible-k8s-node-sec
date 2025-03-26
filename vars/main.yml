@@ -1,0 +1,100 @@
+---
+# Security hardening variables
+
+# Admin user configuration
+admin_user: "inteladmin"
+admin_ssh_key_type: "ed25519"
+admin_ssh_key_bits: 4096
+admin_ssh_key_path: "{{ lookup('env', 'HOME') }}/.ssh/{{ admin_user }}_id_{{ admin_ssh_key_type }}"
+admin_sudo_without_password: true
+
+# SSH hardening configuration
+ssh_port: 22
+ssh_permit_root_login: "prohibit-password"
+ssh_password_authentication: "no"
+ssh_x11_forwarding: "no"
+ssh_max_auth_tries: 3
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+ssh_allow_agent_forwarding: "no"
+ssh_allow_tcp_forwarding: "no"
+
+# Firewall configuration
+ufw_enabled: true
+ufw_allow_ssh: true
+ufw_default_incoming: "deny"
+ufw_default_outgoing: "allow"
+ufw_kubernetes_ports:
+  - { port: 6443, proto: "tcp", comment: "Kubernetes API server" }
+  - { port: "2379:2380", proto: "tcp", comment: "etcd server client API" }
+  - { port: 10250, proto: "tcp", comment: "Kubelet API" }
+  - { port: 10259, proto: "tcp", comment: "kube-scheduler" }
+  - { port: 10257, proto: "tcp", comment: "kube-controller-manager" }
+  - { port: "30000:32767", proto: "tcp", comment: "NodePort Services" }
+
+# Cilium-specific firewall ports
+ufw_cilium_ports:
+  - { port: 4240, proto: "tcp", comment: "Cilium health checks" }
+  - { port: 4244, proto: "tcp", comment: "Hubble server" }
+  - { port: 4245, proto: "tcp", comment: "Hubble relay" }
+  - { port: 51871, proto: "udp", comment: "Cilium VXLAN tunnel" }
+
+# Kernel hardening parameters
+sysctl_settings:
+  # IP Spoofing protection
+  - { key: "net.ipv4.conf.all.rp_filter", value: 1 }
+  - { key: "net.ipv4.conf.default.rp_filter", value: 1 }
+  
+  # Kubernetes requires IP forwarding
+  - { key: "net.ipv4.ip_forward", value: 1 }
+  
+  # Disable ICMP redirect acceptance
+  - { key: "net.ipv4.conf.all.accept_redirects", value: 0 }
+  - { key: "net.ipv4.conf.default.accept_redirects", value: 0 }
+  - { key: "net.ipv6.conf.all.accept_redirects", value: 0 }
+  - { key: "net.ipv6.conf.default.accept_redirects", value: 0 }
+  
+  # Disable ICMP redirect sending
+  - { key: "net.ipv4.conf.all.send_redirects", value: 0 }
+  - { key: "net.ipv4.conf.default.send_redirects", value: 0 }
+  
+  # Block SYN attacks
+  - { key: "net.ipv4.tcp_syncookies", value: 1 }
+  - { key: "net.ipv4.tcp_max_syn_backlog", value: 2048 }
+  - { key: "net.ipv4.tcp_synack_retries", value: 2 }
+  - { key: "net.ipv4.tcp_syn_retries", value: 5 }
+  
+  # Log Martians
+  - { key: "net.ipv4.conf.all.log_martians", value: 1 }
+  - { key: "net.ipv4.icmp_ignore_bogus_error_responses", value: 1 }
+  
+  # Increase system file descriptors
+  - { key: "fs.file-max", value: 65535 }
+  
+  # Cilium-specific kernel parameters
+  - { key: "net.core.bpf_jit_limit", value: 1000000000 }
+  - { key: "net.ipv4.conf.all.rp_filter", value: 0 }
+  - { key: "net.ipv4.conf.default.rp_filter", value: 0 }
+
+# Auditd configuration
+auditd_buffer_size: 8192
+auditd_rules_file: "/etc/audit/rules.d/audit.rules"
+auditd_max_log_file: 50
+auditd_max_log_file_action: "keep_logs"
+auditd_space_left_action: "email"
+auditd_action_mail_acct: "root"
+auditd_admin_space_left_action: "halt"
+
+# Fail2ban configuration
+fail2ban_enabled: true
+fail2ban_bantime: 3600
+fail2ban_findtime: 600
+fail2ban_maxretry: 3
+
+# Containerd security settings
+containerd_enable_systemd_cgroup: true
+containerd_no_new_privileges: true
+containerd_socket_permissions: "0600"
+
+# System updates
+enable_system_updates: false  # Set to true to enable system package updates 

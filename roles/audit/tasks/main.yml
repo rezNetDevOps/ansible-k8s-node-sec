@@ -1,0 +1,52 @@
+---
+# Audit logging setup tasks
+
+- name: Install auditd and related packages
+  apt:
+    name:
+      - auditd
+      - audispd-plugins
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Backup existing audit rules
+  copy:
+    src: "{{ auditd_rules_file }}"
+    dest: "/root/security-backup/audit.rules.backup"
+    remote_src: true
+    force: false
+  ignore_errors: true
+  register: backup_result
+  
+- name: Create audit rules directory
+  file:
+    path: "/etc/audit/rules.d"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Configure auditd settings
+  template:
+    src: auditd.conf.j2
+    dest: /etc/audit/auditd.conf
+    owner: root
+    group: root
+    mode: '0640'
+  notify: Restart auditd
+
+- name: Configure audit rules
+  template:
+    src: audit.rules.j2
+    dest: "{{ auditd_rules_file }}"
+    owner: root
+    group: root
+    mode: '0640'
+  notify: Restart auditd
+
+- name: Ensure auditd is running and enabled
+  service:
+    name: auditd
+    state: started
+    enabled: true

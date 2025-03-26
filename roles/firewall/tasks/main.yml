@@ -1,0 +1,55 @@
+---
+# Firewall (UFW) configuration tasks
+
+- name: Install UFW package
+  apt:
+    name: ufw
+    state: present
+    update_cache: yes
+  when: 
+    - ufw_enabled
+    - ansible_os_family == "Debian"
+
+- name: Set UFW default policies
+  ufw:
+    state: enabled
+    default: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  with_items:
+    - { direction: 'incoming', policy: "{{ ufw_default_incoming }}" }
+    - { direction: 'outgoing', policy: "{{ ufw_default_outgoing }}" }
+  when: ufw_enabled
+
+- name: Allow SSH access
+  ufw:
+    rule: allow
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: "SSH access"
+  when: 
+    - ufw_enabled
+    - ufw_allow_ssh
+
+- name: Configure UFW for Kubernetes API server
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  with_items: "{{ ufw_kubernetes_ports }}"
+  when: ufw_enabled
+
+- name: Configure UFW for Cilium
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  with_items: "{{ ufw_cilium_ports }}"
+  when: ufw_enabled
+
+- name: Enable UFW and apply rules
+  ufw:
+    state: enabled
+    logging: on
+  when: ufw_enabled

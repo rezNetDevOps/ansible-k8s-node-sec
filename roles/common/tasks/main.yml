@@ -1,0 +1,67 @@
+---
+# Common role tasks
+
+- name: Create backup directory
+  file:
+    path: "/root/security-backup"
+    state: directory
+    mode: '0700'
+    owner: root
+    group: root
+
+- name: Install required packages
+  apt:
+    name: "{{ packages }}"
+    state: present
+    update_cache: yes
+  vars:
+    packages:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3-apt
+      - sudo
+      - acl
+      - python3-pip
+  when: ansible_os_family == "Debian"
+
+- name: Set hostname information
+  hostname:
+    name: "{{ inventory_hostname }}"
+  when: inventory_hostname is defined
+
+- name: Update /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: "^{{ hostvars[item]['ansible_host'] }}\\s+{{ item }}\\s*.*$"
+    line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"
+    state: present
+  with_items: "{{ groups['all'] }}"
+  when: hostvars[item]['ansible_host'] is defined
+
+- name: Set timezone to UTC
+  timezone:
+    name: UTC
+
+- name: Configure NTP
+  apt:
+    name: ntp
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Enable NTP service
+  service:
+    name: ntp
+    state: started
+    enabled: yes
+  when: ansible_os_family == "Debian"
+
+- name: Create security status file
+  copy:
+    dest: "/var/log/security-hardening.log"
+    content: "Security hardening applied at {{ ansible_date_time.iso8601 }}\n"
+    owner: root
+    group: root
+    mode: '0600'
