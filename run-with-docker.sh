@@ -45,11 +45,17 @@ echo -e "${YELLOW}Docker image:${NC} $DOCKER_IMAGE"
 echo -e "${YELLOW}Ansible args:${NC} $ANSIBLE_ARGS"
 echo ""
 
+# Create a temporary directory for SSH control paths
+SSH_CONTROL_DIR=$(mktemp -d)
+echo -e "${YELLOW}Creating SSH control directory:${NC} $SSH_CONTROL_DIR"
+chmod 777 $SSH_CONTROL_DIR
+
 # Construct the Docker run command
-DOCKER_CMD="docker run --rm -v $SCRIPT_DIR:/ansible"
+DOCKER_CMD="docker run --rm -v $SCRIPT_DIR:/ansible -v $SSH_CONTROL_DIR:/tmp"
 
 # Mount SSH keys if needed
 if [[ "$ANSIBLE_ARGS" == *"--private-key"* ]] || [[ "$ANSIBLE_ARGS" == *"-k"* ]]; then
+  # Mount SSH keys as read-only
   DOCKER_CMD="$DOCKER_CMD -v $HOME/.ssh:/root/.ssh:ro"
   echo -e "${YELLOW}Mounting SSH keys from:${NC} $HOME/.ssh"
 fi
@@ -58,7 +64,7 @@ fi
 DOCKER_CMD="$DOCKER_CMD -w $DOCKER_WORKING_DIR $DOCKER_IMAGE"
 
 # Add the ansible-playbook command with playbook and args
-DOCKER_CMD="$DOCKER_CMD ansible-playbook k8s-security.yml $ANSIBLE_ARGS"
+DOCKER_CMD="$DOCKER_CMD ansible-playbook k8s-security.yml -e 'ansible_ssh_control_path_dir=/tmp' $ANSIBLE_ARGS"
 
 # Display the full command
 echo -e "${YELLOW}Running command:${NC}"
@@ -67,9 +73,13 @@ echo ""
 
 # Execute the command
 eval $DOCKER_CMD
+EXIT_CODE=$?
+
+# Cleanup the temporary directory
+rm -rf $SSH_CONTROL_DIR
 
 # Check execution result
-if [ $? -eq 0 ]; then
+if [ $EXIT_CODE -eq 0 ]; then
   echo ""
   echo -e "${GREEN}Security hardening playbook execution completed successfully!${NC}"
 else
