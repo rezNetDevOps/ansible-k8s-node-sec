@@ -72,6 +72,24 @@
   changed_when: true
   failed_when: false
 
+# Critical: Ensure kubelet API access for metrics-server
+- name: Allow kubelet API access (port 10250) for metrics-server
+  community.general.ufw:
+    rule: allow
+    port: "10250"
+    proto: tcp
+    comment: "Kubelet API - critical for metrics-server"
+  register: ufw_kubelet_result
+  failed_when: false
+
+- name: Allow kubelet API access (fallback to direct command)
+  ansible.builtin.command: "{{ ufw_path.stdout }} allow 10250/tcp comment 'Kubelet API - critical for metrics-server'"
+  when: 
+    - ufw_kubelet_result is failed or ufw_kubelet_result is skipped
+    - ufw_path.stdout != ""
+  changed_when: true
+  failed_when: false
+
 - name: Configure UFW for Kubernetes API server (fallback method)
   ansible.builtin.command: "{{ ufw_path.stdout }} allow {{ item.port }}/{{ item.proto }} comment '{{ item.comment }}'"
   with_items: "{{ ufw_kubernetes_ports | default([{'port': '6443', 'proto': 'tcp', 'comment': 'Kubernetes API'}]) }}"
