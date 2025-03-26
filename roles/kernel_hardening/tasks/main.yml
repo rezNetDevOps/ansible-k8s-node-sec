@@ -29,6 +29,22 @@
     mode: '0644'
   changed_when: false
 
+- name: Check if sysctl file exists
+  stat:
+    path: /etc/sysctl.d/99-kubernetes-security.conf
+  register: sysctl_file_check
+  check_mode: false
+
+- name: Create empty sysctl file if in check mode
+  copy:
+    content: "# Placeholder file for check mode\n"
+    dest: /etc/sysctl.d/99-kubernetes-security.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: ansible_check_mode and not sysctl_file_check.stat.exists
+  check_mode: false
+
 - name: Set kernel parameters for security
   sysctl:
     name: "{{ item.key }}"
@@ -37,6 +53,7 @@
     reload: yes
     sysctl_file: /etc/sysctl.d/99-kubernetes-security.conf
   with_items: "{{ sysctl_settings }}"
+  when: not ansible_check_mode or sysctl_file_check.stat.exists
 
 - name: Ensure the sysctl file has proper permissions
   file:
@@ -44,7 +61,9 @@
     owner: root
     group: root
     mode: '0644'
+  when: not ansible_check_mode
 
 - name: Apply sysctl settings
   command: sysctl --system
   changed_when: false
+  when: not ansible_check_mode
