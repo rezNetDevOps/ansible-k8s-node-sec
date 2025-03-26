@@ -39,17 +39,11 @@
 
 # Ensure UFW is enabled with correct default policies
 - name: Set UFW default policies (with direct command as fallback)
-  ansible.builtin.shell: |
-    # Use full path to ufw to ensure it's found
-    UFW_COMMAND={{ ufw_path.stdout }}
-    
-    # Check if UFW is already enabled
-    if ! $UFW_COMMAND status | grep -q "Status: active"; then
-      # Set default policies
-      $UFW_COMMAND default deny incoming
-      $UFW_COMMAND default allow outgoing
-      
-      # Don't enable yet, we'll do that after configuring rules
+  ansible.builtin.shell: >
+    UFW_CMD="{{ ufw_path.stdout }}";
+    if ! $UFW_CMD status | grep -q "Status: active"; then
+      $UFW_CMD default deny incoming;
+      $UFW_CMD default allow outgoing;
     fi
   args:
     executable: /bin/bash
@@ -94,20 +88,15 @@
 
 # Enable UFW at the end
 - name: Enable UFW with logging
-  ansible.builtin.shell: |
-    UFW_COMMAND={{ ufw_path.stdout }}
-    
-    # Check if UFW is already enabled
-    if ! $UFW_COMMAND status | grep -q "Status: active"; then
-      # Enable with force to avoid prompt
-      $UFW_COMMAND --force enable
-      echo "UFW enabled"
+  ansible.builtin.shell: >
+    UFW_CMD="{{ ufw_path.stdout }}";
+    if ! $UFW_CMD status | grep -q "Status: active"; then
+      $UFW_CMD --force enable;
+      echo "UFW enabled";
     else
-      echo "UFW already enabled"
-    fi
-    
-    # Set logging
-    $UFW_COMMAND logging on
+      echo "UFW already enabled";
+    fi;
+    $UFW_CMD logging on
   args:
     executable: /bin/bash
   register: ufw_enable
