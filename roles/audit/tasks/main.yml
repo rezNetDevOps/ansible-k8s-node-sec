@@ -49,4 +49,5 @@
     name: auditd
     state: started
     enabled: true
-  when: not ansible_check_mode or audit_install.changed
+  when: not ansible_check_mode
+  check_mode: false

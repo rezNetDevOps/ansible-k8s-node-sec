@@ -1,0 +1,35 @@
+---
+# Default variables for audit role
+
+# Auditd rules file path
+auditd_rules_file: /etc/audit/rules.d/audit.rules
+
+# Log file location
+auditd_log_file: /var/log/audit/audit.log
+
+# Log format
+auditd_log_format: RAW
+
+# Flush settings (none, incremental, data, sync)
+auditd_flush: INCREMENTAL
+
+# How frequently to flush logs (in seconds)
+auditd_freq: 50
+
+# Max log file size in MB
+auditd_max_log_file: 8
+
+# Action to take when max log size is reached (ignore, syslog, suspend, rotate, keep_logs)
+auditd_max_log_file_action: ROTATE
+
+# Number of log files to keep
+auditd_num_logs: 5
+
+# Controls the dispatcher (yes or no)
+auditd_dispatcher: yes
+
+# Name for the dispatcher
+auditd_disp_name: audispd
+
+# Whether to enable auditing (1 for enabled, 0 for disabled)
+auditd_enabled: 1 
