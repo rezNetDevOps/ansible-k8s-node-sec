@@ -1,0 +1,17 @@
+---
+# Default variables for the firewall role
+
+# SSH Configuration
+ssh_port: "22"
+
+# Kubernetes API server ports
+ufw_kubernetes_ports:
+  - { port: "6443", proto: "tcp", comment: "Kubernetes API Server" }
+  - { port: "10250", proto: "tcp", comment: "Kubelet API" }
+  - { port: "2379", proto: "tcp", comment: "etcd client API" }
+  - { port: "2380", proto: "tcp", comment: "etcd peer API" }
+
+# Cilium ports
+ufw_cilium_ports:
+  - { port: "8472", proto: "udp", comment: "Cilium VXLAN" }
+  - { port: "4240", proto: "tcp", comment: "Cilium health checks" } 

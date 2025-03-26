@@ -1,6 +1,8 @@
 ---
 # Firewall role handlers
 
+# This handler is kept for compatibility but may not be needed with the new approach
 - name: Enable UFW
-  command: ufw --force enable
-  changed_when: true 
+  ansible.builtin.shell: "{{ ufw_path.stdout | default('/usr/sbin/ufw') }} --force enable"
+  changed_when: true
+  when: ufw_path is defined and ufw_path.stdout != "" 

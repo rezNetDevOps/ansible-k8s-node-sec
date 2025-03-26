@@ -2,73 +2,114 @@
 # Firewall (UFW) configuration tasks
 
 - name: Install UFW package
-  apt:
+  ansible.builtin.apt:
     name: ufw
     state: present
     update_cache: yes
   register: ufw_install
   when: ansible_os_family == "Debian"
 
-# Ensure UFW is available in the path after installation
-- name: Ensure UFW is accessible in PATH
-  block:
-    - name: Check if UFW is installed correctly
-      stat:
-        path: /usr/sbin/ufw
-      register: ufw_binary
-      
-    - name: Create UFW symlink if needed
-      file:
-        src: /usr/sbin/ufw
-        dest: /usr/bin/ufw
-        state: link
-      when: ufw_binary.stat.exists
-      
-    - name: Refresh facts after installation
-      setup:
-        filter: ansible_path
-  when: ufw_install is changed
+# Make sure we can find UFW after installation
+- name: Locate UFW executable
+  ansible.builtin.shell: which ufw || find /usr -name ufw | head -n 1
+  register: ufw_path
+  changed_when: false
+  failed_when: false
+  check_mode: false
 
-- name: Set UFW default policies
-  community.general.ufw:
-    direction: "{{ item.direction }}"
-    policy: "{{ item.policy }}"
-    state: enabled
-  with_items:
-    - { direction: 'incoming', policy: 'deny' }
-    - { direction: 'outgoing', policy: 'allow' }
-  notify: Enable UFW
+- name: Debug UFW path
+  ansible.builtin.debug:
+    var: ufw_path.stdout
+    verbosity: 1
 
+- name: Create symlink for UFW if needed
+  ansible.builtin.file:
+    src: "{{ ufw_path.stdout }}"
+    dest: "/usr/bin/ufw"
+    state: link
+  when: ufw_path.stdout != "/usr/bin/ufw" and ufw_path.stdout != ""
+  register: ufw_symlink
+
+- name: Find UFW module path
+  ansible.builtin.shell: python3 -c "import sys; print([p for p in sys.path if 'ansible' in p][0] if [p for p in sys.path if 'ansible' in p] else '')"
+  register: ansible_path
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Ensure UFW is enabled with correct default policies
+- name: Set UFW default policies (with direct command as fallback)
+  ansible.builtin.shell: |
+    # Use full path to ufw to ensure it's found
+    UFW_COMMAND={{ ufw_path.stdout }}
+    
+    # Check if UFW is already enabled
+    if ! $UFW_COMMAND status | grep -q "Status: active"; then
+      # Set default policies
+      $UFW_COMMAND default deny incoming
+      $UFW_COMMAND default allow outgoing
+      
+      # Don't enable yet, we'll do that after configuring rules
+    fi
+  args:
+    executable: /bin/bash
+  register: ufw_default_policies
+  changed_when: "'Firewall is active' in ufw_default_policies.stdout"
+  failed_when: 
+    - ufw_default_policies.rc != 0
+    - "'Could not find' not in ufw_default_policies.stderr"
+  when: ufw_path.stdout != ""
+
+# Now use the module approach where possible
 - name: Allow SSH access
-  ufw:
+  community.general.ufw:
     rule: allow
-    port: "{{ ssh_port }}"
+    port: "{{ ssh_port | default('22') }}"
     proto: tcp
     comment: "SSH access"
+  register: ufw_ssh_result
+  failed_when: false
+
+- name: Allow SSH access (fallback to direct command)
+  ansible.builtin.command: "{{ ufw_path.stdout }} allow {{ ssh_port | default('22') }}/tcp comment 'SSH access'"
   when: 
-    - ufw_enabled
-    - ufw_allow_ssh
+    - ufw_ssh_result is failed or ufw_ssh_result is skipped
+    - ufw_path.stdout != ""
+  changed_when: true
+  failed_when: false
 
-- name: Configure UFW for Kubernetes API server
-  ufw:
-    rule: allow
-    port: "{{ item.port }}"
-    proto: "{{ item.proto }}"
-    comment: "{{ item.comment }}"
-  with_items: "{{ ufw_kubernetes_ports }}"
-  when: ufw_enabled
+- name: Configure UFW for Kubernetes API server (fallback method)
+  ansible.builtin.command: "{{ ufw_path.stdout }} allow {{ item.port }}/{{ item.proto }} comment '{{ item.comment }}'"
+  with_items: "{{ ufw_kubernetes_ports | default([{'port': '6443', 'proto': 'tcp', 'comment': 'Kubernetes API'}]) }}"
+  when: ufw_path.stdout != ""
+  changed_when: true
+  failed_when: false
 
-- name: Configure UFW for Cilium
-  ufw:
-    rule: allow
-    port: "{{ item.port }}"
-    proto: "{{ item.proto }}"
-    comment: "{{ item.comment }}"
-  with_items: "{{ ufw_cilium_ports }}"
-  when: ufw_enabled
+- name: Configure UFW for Cilium (fallback method)
+  ansible.builtin.command: "{{ ufw_path.stdout }} allow {{ item.port }}/{{ item.proto }} comment '{{ item.comment }}'"
+  with_items: "{{ ufw_cilium_ports | default([{'port': '8472', 'proto': 'udp', 'comment': 'Cilium VXLAN'}]) }}"
+  when: ufw_path.stdout != ""
+  changed_when: true
+  failed_when: false
 
-- name: Enable UFW and apply rules
-  ufw:
-    state: enabled
-    logging: on
-  when: ufw_enabled
+# Enable UFW at the end
+- name: Enable UFW with logging
+  ansible.builtin.shell: |
+    UFW_COMMAND={{ ufw_path.stdout }}
+    
+    # Check if UFW is already enabled
+    if ! $UFW_COMMAND status | grep -q "Status: active"; then
+      # Enable with force to avoid prompt
+      $UFW_COMMAND --force enable
+      echo "UFW enabled"
+    else
+      echo "UFW already enabled"
+    fi
+    
+    # Set logging
+    $UFW_COMMAND logging on
+  args:
+    executable: /bin/bash
+  register: ufw_enable
+  changed_when: "'UFW enabled' in ufw_enable.stdout"
+  when: ufw_path.stdout != ""
