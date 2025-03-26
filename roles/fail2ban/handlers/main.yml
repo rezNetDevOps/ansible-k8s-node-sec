@@ -4,4 +4,5 @@
 - name: Restart fail2ban
   service:
     name: fail2ban
-    state: restarted 
+    state: restarted
+  when: not ansible_check_mode 

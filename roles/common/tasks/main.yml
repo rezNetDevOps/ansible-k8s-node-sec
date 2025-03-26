@@ -87,20 +87,15 @@
     # If no active time service, enable timesyncd as it's already available on most systems
     - name: Enable timesyncd if no time service is active
       block:
-        - name: Enable and start systemd-timesyncd
+        - name: Ensure timesyncd is enabled and running
           service:
             name: systemd-timesyncd
             state: started
             enabled: yes
       when:
         - ansible_facts.services['systemd-timesyncd.service'] is defined
-        - ansible_facts.services['systemd-timesyncd.service'].state != 'running'
-        - (ansible_facts.services['ntpd.service'] is not defined or 
-          ansible_facts.services['ntpd.service'].state != 'running')
-        - (ansible_facts.services['ntpsec.service'] is not defined or 
-          ansible_facts.services['ntpsec.service'].state != 'running')
-        - (ansible_facts.services['chronyd.service'] is not defined or 
-          ansible_facts.services['chronyd.service'].state != 'running')
+        - not ansible_check_mode
+      check_mode: false
 
 - name: Create security status file
   copy:

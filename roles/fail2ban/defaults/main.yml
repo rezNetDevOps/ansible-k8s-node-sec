@@ -1,0 +1,23 @@
+---
+# Default variables for fail2ban role
+
+# Enable or disable fail2ban
+fail2ban_enabled: true
+
+# Fail2ban configuration settings
+fail2ban_loglevel: INFO
+fail2ban_logtarget: /var/log/fail2ban.log
+
+# Default jail settings
+fail2ban_ignoreip: 127.0.0.1/8
+fail2ban_bantime: 3600
+fail2ban_findtime: 600
+fail2ban_maxretry: 5
+fail2ban_backend: auto
+
+# Enable SSH jail by default
+fail2ban_sshd_enabled: true
+fail2ban_sshd_port: ssh
+fail2ban_sshd_filter: sshd
+fail2ban_sshd_logpath: /var/log/auth.log
+fail2ban_sshd_maxretry: 5 

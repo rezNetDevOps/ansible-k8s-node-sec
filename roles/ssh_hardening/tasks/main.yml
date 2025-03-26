@@ -75,3 +75,5 @@
     name: ssh
     state: started
     enabled: true
+  when: not ansible_check_mode
+  check_mode: false

@@ -53,9 +53,12 @@
     mode: "{{ containerd_socket_permissions }}"
   ignore_errors: true
 
-- name: Restart containerd when configuration changes
+- name: Restart containerd
   service:
     name: containerd
     state: restarted
     enabled: yes
-  when: cgroup_update.changed or no_new_privileges_update.changed or default_config is defined and default_config.changed
+  when: 
+    - cgroup_update.changed or no_new_privileges_update.changed or default_config is defined and default_config.changed
+    - not ansible_check_mode
+  check_mode: false
