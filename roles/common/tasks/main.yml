@@ -45,18 +45,87 @@
   timezone:
     name: UTC
 
-- name: Configure NTP
-  apt:
-    name: ntp
-    state: present
-  when: ansible_os_family == "Debian"
+# NTP configuration - systemd-timesyncd approach
+- name: Check if systemd-timesyncd is active
+  command: systemctl is-active systemd-timesyncd
+  register: timesyncd_status
+  changed_when: false
+  failed_when: false
 
-- name: Enable NTP service
-  service:
-    name: ntp
-    state: started
-    enabled: yes
-  when: ansible_os_family == "Debian"
+- name: Check if ntpsec is installed
+  command: dpkg-query -W -f='${Status}' ntpsec
+  register: ntpsec_status
+  changed_when: false
+  failed_when: false
+
+- name: Check if ntp is installed
+  command: dpkg-query -W -f='${Status}' ntp
+  register: ntp_status
+  changed_when: false
+  failed_when: false
+
+- name: Configure systemd-timesyncd if active
+  block:
+    - name: Ensure systemd-timesyncd configuration directory exists
+      file:
+        path: /etc/systemd/timesyncd.conf.d
+        state: directory
+        mode: '0755'
+        
+    - name: Configure timesyncd NTP servers
+      copy:
+        dest: /etc/systemd/timesyncd.conf.d/ntp.conf
+        content: |
+          [Time]
+          NTP=0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.ntp.org
+          FallbackNTP=ntp.ubuntu.com
+        mode: '0644'
+      notify: Restart timesyncd
+  when: timesyncd_status.stdout == "active"
+
+- name: Use ntpsec if installed
+  block:
+    - name: Ensure ntpsec service is enabled and started
+      service:
+        name: ntpsec
+        state: started
+        enabled: yes
+  when: 
+    - ntpsec_status.stdout == "install ok installed"
+    - timesyncd_status.stdout != "active"
+
+- name: Use ntp if installed
+  block:
+    - name: Ensure ntp service is enabled and started
+      service:
+        name: ntp
+        state: started
+        enabled: yes
+  when: 
+    - ntp_status.stdout == "install ok installed"
+    - timesyncd_status.stdout != "active"
+    - ntpsec_status.stdout != "install ok installed"
+
+- name: Install ntp only if no time service is active
+  block:
+    - name: Install ntp package
+      apt:
+        name: ntp
+        state: present
+        update_cache: yes
+      register: ntp_install
+      
+    - name: Enable ntp service
+      service:
+        name: ntp
+        state: started
+        enabled: yes
+      when: ntp_install is success
+  when: 
+    - timesyncd_status.stdout != "active" 
+    - ntpsec_status.stdout != "install ok installed"
+    - ntp_status.stdout != "install ok installed"
+    - ansible_os_family == "Debian"
 
 - name: Create security status file
   copy:
