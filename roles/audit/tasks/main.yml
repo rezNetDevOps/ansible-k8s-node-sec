@@ -53,18 +53,26 @@
   failed_when: false
   when: audit_rules_updated is defined and audit_rules_updated.changed
 
+- name: Set validation result variables
+  set_fact:
+    audit_rules_valid: "{{ audit_rules_validation.get('rc', 1) == 0 if audit_rules_validation is defined else false }}"
+  when: audit_rules_updated is defined and audit_rules_updated.changed
+
 - name: Debug audit rules validation
   debug:
-    msg: "Audit rules validation result: {{ audit_rules_validation.stderr if audit_rules_validation.stderr is defined else 'OK' }}"
-  when: audit_rules_validation is defined
+    msg: >-
+      Audit rules validation result: 
+      {{ audit_rules_validation.stderr if (audit_rules_validation is defined and audit_rules_validation.stderr is defined) else 
+      (audit_rules_validation.stdout if (audit_rules_validation is defined and audit_rules_validation.stdout is defined) else 'Validation not run') }}
+  when: audit_rules_updated is defined and audit_rules_updated.changed
 
 - name: Load audit rules directly (if validation succeeded)
   command: auditctl -R /etc/audit/rules.d/audit.rules
   args:
     warn: false
   when: 
-    - audit_rules_validation is defined 
-    - audit_rules_validation.rc == 0
+    - audit_rules_updated is defined and audit_rules_updated.changed
+    - audit_rules_valid | default(false) | bool
     - not ansible_check_mode
   changed_when: true
   notify: restart auditd
