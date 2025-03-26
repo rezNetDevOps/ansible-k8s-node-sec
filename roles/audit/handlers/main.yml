@@ -1,7 +1,8 @@
 ---
 # Audit handlers
 
-- name: Restart auditd
+- name: restart auditd
   service:
     name: auditd
-    state: restarted 
+    state: restarted
+  when: not ansible_check_mode 
