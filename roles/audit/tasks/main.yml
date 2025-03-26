@@ -6,6 +6,13 @@
     name: auditd
     state: present
   register: audit_install
+  when: not ansible_check_mode
+
+- name: Register audit installation as changed in check mode
+  set_fact:
+    audit_install:
+      changed: true
+  when: ansible_check_mode
 
 - name: Create audit log directory
   file:
@@ -14,14 +21,6 @@
     mode: '0750'
     owner: root
     group: root
-  when: not ansible_check_mode or audit_install.changed
-
-- name: Backup existing audit rules
-  copy:
-    src: /etc/audit/rules.d/audit.rules
-    dest: /etc/audit/rules.d/audit.rules.bak
-    remote_src: true
-  ignore_errors: true
   when: not ansible_check_mode
 
 - name: Create audit rules directory
@@ -31,7 +30,15 @@
     mode: '0750'
     owner: root
     group: root
-  when: not ansible_check_mode or audit_install.changed
+  when: not ansible_check_mode
+
+- name: Backup existing audit rules
+  copy:
+    src: /etc/audit/rules.d/audit.rules
+    dest: /etc/audit/rules.d/audit.rules.bak
+    remote_src: true
+  ignore_errors: true
+  when: not ansible_check_mode
 
 - name: Configure auditd settings
   template:
@@ -41,7 +48,7 @@
     group: root
     mode: '0640'
   notify: restart auditd
-  when: not ansible_check_mode or audit_install.changed
+  when: not ansible_check_mode
 
 - name: Configure audit rules
   template:
@@ -50,8 +57,13 @@
     owner: root
     group: root
     mode: '0640'
-  register: audit_rules_updated
-  when: not ansible_check_mode or audit_install.changed
+  when: not ansible_check_mode
+
+- name: Check if audit.rules file exists
+  stat:
+    path: /etc/audit/rules.d/audit.rules
+  register: audit_rules_file
+  when: not ansible_check_mode
 
 - name: Validate audit rules
   command: auditctl -R /etc/audit/rules.d/audit.rules
@@ -59,23 +71,31 @@
     warn: false
   register: audit_rules_validation
   ignore_errors: true
-  when: not ansible_check_mode
+  when: not ansible_check_mode and audit_rules_file.stat.exists|default(false)
+  changed_when: false
 
-- name: Set validation result variables
+- name: Show audit rule validation output
+  debug:
+    var: audit_rules_validation
+    verbosity: 1
+  when: not ansible_check_mode and audit_rules_validation is defined
+
+- name: Set audit rules validation result
   set_fact:
-    audit_rules_valid: "{{ audit_rules_validation.rc == 0 }}"
+    audit_rules_valid: "{{ (audit_rules_validation.rc|default(1) == 0) if audit_rules_validation is defined else false }}"
   when: not ansible_check_mode
 
 - name: Debug audit rules validation
   debug:
-    msg: "Audit rules validation {{ 'succeeded' if audit_rules_valid else 'failed' }}"
+    msg: "Audit rules validation {{ 'succeeded' if audit_rules_valid|default(false) else 'failed or skipped' }}"
   when: not ansible_check_mode
 
 - name: Load audit rules directly (if validation succeeded)
   command: auditctl -R /etc/audit/rules.d/audit.rules
   args:
     warn: false
-  when: not ansible_check_mode and audit_rules_valid
+  when: not ansible_check_mode and audit_rules_valid|default(false)
+  changed_when: true
 
 - name: Ensure auditd is running and enabled
   service:
@@ -87,12 +107,18 @@
   when: not ansible_check_mode
 
 - name: Check auditd service status
-  command: systemctl status auditd
+  shell: systemctl status auditd || true
   register: auditd_status
+  changed_when: false
   ignore_errors: true
-  when: not ansible_check_mode and auditd_service.failed
+  when: not ansible_check_mode and auditd_service.failed is defined and auditd_service.failed
 
 - name: Display auditd service status
   debug:
     var: auditd_status.stdout_lines
-  when: not ansible_check_mode and auditd_service.failed
+  when: not ansible_check_mode and auditd_status is defined and auditd_status.stdout_lines is defined
+
+- name: Skip auditd in check mode
+  debug:
+    msg: "Skipping auditd operations in check mode"
+  when: ansible_check_mode
