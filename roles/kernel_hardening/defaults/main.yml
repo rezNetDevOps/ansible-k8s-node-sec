@@ -1,0 +1,27 @@
+---
+# Default values for kernel_hardening role
+
+# Default sysctl settings - these can be overridden by the vars/main.yml file
+sysctl_settings:
+  # IP Spoofing protection
+  - { key: "net.ipv4.conf.all.rp_filter", value: 1 }
+  - { key: "net.ipv4.conf.default.rp_filter", value: 1 }
+  
+  # Kubernetes requires IP forwarding
+  - { key: "net.ipv4.ip_forward", value: 1 }
+  
+  # Disable ICMP redirect acceptance
+  - { key: "net.ipv4.conf.all.accept_redirects", value: 0 }
+  - { key: "net.ipv4.conf.default.accept_redirects", value: 0 }
+  - { key: "net.ipv6.conf.all.accept_redirects", value: 0 }
+  - { key: "net.ipv6.conf.default.accept_redirects", value: 0 }
+  
+  # Disable ICMP redirect sending
+  - { key: "net.ipv4.conf.all.send_redirects", value: 0 }
+  - { key: "net.ipv4.conf.default.send_redirects", value: 0 }
+  
+  # Block SYN attacks
+  - { key: "net.ipv4.tcp_syncookies", value: 1 }
+  - { key: "net.ipv4.tcp_max_syn_backlog", value: 2048 }
+  - { key: "net.ipv4.tcp_synack_retries", value: 2 }
+  - { key: "net.ipv4.tcp_syn_retries", value: 5 } 

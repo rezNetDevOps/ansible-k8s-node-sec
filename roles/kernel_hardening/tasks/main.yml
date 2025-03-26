@@ -11,6 +11,24 @@
     mode: '0600'
   when: not ansible_check_mode
 
+# Ensure the sysctl file exists before trying to modify it
+- name: Ensure sysctl.d directory exists
+  file:
+    path: /etc/sysctl.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create initial sysctl configuration file
+  file:
+    path: /etc/sysctl.d/99-kubernetes-security.conf
+    state: touch
+    owner: root
+    group: root
+    mode: '0644'
+  changed_when: false
+
 - name: Set kernel parameters for security
   sysctl:
     name: "{{ item.key }}"
