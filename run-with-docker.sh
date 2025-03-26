@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # Default configuration
 DOCKER_IMAGE="willhallonline/ansible:latest"
-DOCKER_WORKING_DIR="/ansible/k8s/ansible/node-sec"
+DOCKER_WORKING_DIR="/ansible"
 ANSIBLE_ARGS=""
 
 # Parse command line arguments
@@ -46,11 +46,11 @@ echo -e "${YELLOW}Ansible args:${NC} $ANSIBLE_ARGS"
 echo ""
 
 # Construct the Docker run command
-DOCKER_CMD="docker run --rm -v $(cd $SCRIPT_DIR/../../.. && pwd):/ansible"
+DOCKER_CMD="docker run --rm -v $SCRIPT_DIR:/ansible"
 
 # Mount SSH keys if needed
 if [[ "$ANSIBLE_ARGS" == *"--private-key"* ]] || [[ "$ANSIBLE_ARGS" == *"-k"* ]]; then
-  DOCKER_CMD="$DOCKER_CMD -v $HOME/.ssh:/root/.ssh:ro -v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro"
+  DOCKER_CMD="$DOCKER_CMD -v $HOME/.ssh:/root/.ssh:ro"
   echo -e "${YELLOW}Mounting SSH keys from:${NC} $HOME/.ssh"
 fi
 
